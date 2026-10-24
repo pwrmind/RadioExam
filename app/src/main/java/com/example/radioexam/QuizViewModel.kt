@@ -126,6 +126,18 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 currentAttemptId = testDao.insertAttempt(newAttempt)
 
+                // ВАЖНО: Предзаполняем user_answers, чтобы вопросы не потерялись
+                loadedQuestions.forEach { q ->
+                    testDao.insertUserAnswer(
+                        UserAnswerEntity(
+                            attemptId = currentAttemptId,
+                            questionId = q.id,
+                            selectedAnswerId = null,
+                            status = QuestionStatus.UNTOUCHED.name
+                        )
+                    )
+                }
+
                 _questions.value = loadedQuestions
                 _currentQuestionIndex.value = 0
                 _score.value = 0

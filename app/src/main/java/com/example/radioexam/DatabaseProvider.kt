@@ -48,7 +48,7 @@ object DatabaseProvider {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
-                "radioexam_v5.db" // <--- ИЗМЕНЕНО ИМЯ БАЗЫ ДАННЫХ
+                "radioexam_v6.db"
             )
                 .fallbackToDestructiveMigration()
                 .addCallback(SeedDatabaseCallback())

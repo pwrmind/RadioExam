@@ -44,16 +44,7 @@ data class AttemptEntity(
     val sectionId: String,
     val isCompleted: Boolean = false,
     val lastUpdated: Long = System.currentTimeMillis(),
-    /**
-     * Оставшееся время в секундах.
-     * -1 — тест ещё не запускался, при загрузке будет рассчитано максимальное время.
-     * 0 — время истекло.
-     */
     val secondsLeft: Int = -1,
-    /**
-     * Сколько вопросов было выбрано в попытке.
-     * Нужно для отображения прогресса «X из Y», даже когда user_answers пуст.
-     */
     val totalQuestions: Int = 0
 )
 
@@ -62,11 +53,9 @@ data class UserAnswerEntity(
     val attemptId: Long,
     val questionId: Int,
     val selectedAnswerId: Long?,
-    val status: String
+    val status: String // "UNTOUCHED", "SKIPPED", "CORRECT", "INCORRECT"
 )
 
-// Класс для объединения Попытки и Секции (чтобы знать название теста)
-// Оставлен для обратной совместимости.
 data class AttemptWithSection(
     @Embedded val attempt: AttemptEntity,
     @Relation(
@@ -76,10 +65,6 @@ data class AttemptWithSection(
     val section: SectionEntity
 )
 
-/**
- * Плоская сводка по попытке для экрана «Мои тесты».
- * Считается одним SQL-запросом (LEFT JOIN + GROUP BY).
- */
 data class AttemptSummary(
     val attemptId: Long,
     val sectionId: String,
@@ -90,9 +75,6 @@ data class AttemptSummary(
     val correctCount: Int
 )
 
-/**
- * Секция каталога + прогресс активной попытки (если она есть).
- */
 data class SectionWithProgress(
     val id: String,
     val name: String,
@@ -129,11 +111,6 @@ interface TestDao {
     @Update
     suspend fun updateAttempt(attempt: AttemptEntity)
 
-    /**
-     * Безопасное сохранение прогресса таймера.
-     * Обновляет только незавершённые попытки.
-     * ВАЖНО: параметры без значений по умолчанию — иначе KSP падает с "unexpected jvm signature V".
-     */
     @Query(
         "UPDATE attempts SET secondsLeft = :secondsLeft, lastUpdated = :lastUpdated " +
                 "WHERE attemptId = :attemptId AND isCompleted = 0"
@@ -144,10 +121,6 @@ interface TestDao {
         lastUpdated: Long
     )
 
-    /**
-     * Атомарное завершение попытки.
-     * ВАЖНО: параметры без значений по умолчанию — иначе KSP падает.
-     */
     @Query(
         "UPDATE attempts SET isCompleted = 1, lastUpdated = :lastUpdated " +
                 "WHERE attemptId = :attemptId"
@@ -182,7 +155,7 @@ interface TestDao {
             s.name AS sectionName,
             a.lastUpdated AS lastUpdated,
             a.totalQuestions AS totalCount,
-            COUNT(ua.questionId) AS answeredCount,
+            COUNT(CASE WHEN ua.status != 'UNTOUCHED' THEN 1 END) AS answeredCount,
             COALESCE(SUM(CASE WHEN ua.status = 'CORRECT' THEN 1 ELSE 0 END), 0) AS correctCount
         FROM attempts a
         INNER JOIN sections s ON s.id = a.sectionId
@@ -202,7 +175,7 @@ interface TestDao {
             s.name AS sectionName,
             a.lastUpdated AS lastUpdated,
             a.totalQuestions AS totalCount,
-            COUNT(ua.questionId) AS answeredCount,
+            COUNT(CASE WHEN ua.status != 'UNTOUCHED' THEN 1 END) AS answeredCount,
             COALESCE(SUM(CASE WHEN ua.status = 'CORRECT' THEN 1 ELSE 0 END), 0) AS correctCount
         FROM attempts a
         INNER JOIN sections s ON s.id = a.sectionId
@@ -223,7 +196,7 @@ interface TestDao {
             a.attemptId AS activeAttemptId,
             COALESCE(a.totalQuestions, 0) AS totalInAttempt,
             COALESCE(
-                (SELECT COUNT(*) FROM user_answers WHERE attemptId = a.attemptId),
+                (SELECT COUNT(*) FROM user_answers WHERE attemptId = a.attemptId AND status != 'UNTOUCHED'),
                 0
             ) AS answeredCount
         FROM sections s

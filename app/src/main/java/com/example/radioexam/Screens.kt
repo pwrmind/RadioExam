@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PlayArrow
@@ -63,12 +67,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+
+// --- Вспомогательные функции для цветов ---
+@Composable
+private fun getQuestionContainerColor(isCurrent: Boolean, state: UserAnswerState?): Color {
+    return when {
+        isCurrent -> MaterialTheme.colorScheme.primary
+        state?.status == QuestionStatus.CORRECT -> MaterialTheme.colorScheme.tertiary
+        state?.status == QuestionStatus.INCORRECT -> MaterialTheme.colorScheme.error
+        state?.status == QuestionStatus.SKIPPED -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+}
+
+@Composable
+private fun getQuestionTextColor(isCurrent: Boolean, state: UserAnswerState?): Color {
+    return when {
+        isCurrent -> MaterialTheme.colorScheme.onPrimary
+        state?.status == QuestionStatus.CORRECT -> MaterialTheme.colorScheme.onTertiary
+        state?.status == QuestionStatus.INCORRECT -> MaterialTheme.colorScheme.onError
+        state?.status == QuestionStatus.SKIPPED -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
 
 // --- 1. КАТАЛОГ ТЕСТОВ ---
 @OptIn(ExperimentalMaterial3Api::class)
@@ -243,7 +271,7 @@ fun MyTestsScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Войти", style = MaterialTheme.typography.labelMedium)
+                            Text("Продолжить", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -438,6 +466,7 @@ fun QuizScreen(
 
     val haptic = LocalHapticFeedback.current
     var showHintSheet by remember { mutableStateOf(false) }
+    var showGridSheet by remember { mutableStateOf(false) } // Состояние для сетки
 
     LaunchedEffect(sectionId) {
         viewModel.loadTest(sectionId)
@@ -461,6 +490,7 @@ fun QuizScreen(
     val isAnswered = currentState?.status == QuestionStatus.CORRECT ||
             currentState?.status == QuestionStatus.INCORRECT
 
+    // --- Шторка для подсказки ---
     if (showHintSheet) {
         ModalBottomSheet(
             onDismissRequest = { showHintSheet = false },
@@ -497,9 +527,66 @@ fun QuizScreen(
         }
     }
 
+    // --- Шторка для сетки вопросов ---
+    if (showGridSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showGridSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = "Навигация по вопросам",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(5),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    gridItemsIndexed(questions) { index, _ ->
+                        val state = userAnswers[index]
+                        val isCurrent = index == currentIndex
+                        val containerColor = getQuestionContainerColor(isCurrent, state)
+                        val textColor = getQuestionTextColor(isCurrent, state)
+
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(containerColor)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.jumpToQuestion(index)
+                                    showGridSheet = false // Закрываем сетку после выбора
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${index + 1}",
+                                color = textColor,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
+        // Верхняя лента быстрого доступа
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -507,21 +594,8 @@ fun QuizScreen(
             itemsIndexed(questions) { index, _ ->
                 val state = userAnswers[index]
                 val isCurrent = index == currentIndex
-
-                val containerColor = when {
-                    isCurrent -> MaterialTheme.colorScheme.primary
-                    state?.status == QuestionStatus.CORRECT -> MaterialTheme.colorScheme.tertiary
-                    state?.status == QuestionStatus.INCORRECT -> MaterialTheme.colorScheme.error
-                    state?.status == QuestionStatus.SKIPPED -> MaterialTheme.colorScheme.secondaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
-                }
-                val textColor = when {
-                    isCurrent -> MaterialTheme.colorScheme.onPrimary
-                    state?.status == QuestionStatus.CORRECT -> MaterialTheme.colorScheme.onTertiary
-                    state?.status == QuestionStatus.INCORRECT -> MaterialTheme.colorScheme.onError
-                    state?.status == QuestionStatus.SKIPPED -> MaterialTheme.colorScheme.onSecondaryContainer
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                val containerColor = getQuestionContainerColor(isCurrent, state)
+                val textColor = getQuestionTextColor(isCurrent, state)
 
                 Box(
                     modifier = Modifier
@@ -556,6 +630,17 @@ fun QuizScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Кнопка открытия сетки вопросов
+            IconButton(onClick = { showGridSheet = true }) {
+                Icon(
+                    imageVector = Icons.Default.GridView,
+                    contentDescription = "Все вопросы",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
             val isLowTime = formattedTime.startsWith("00:")
             Surface(
                 color = if (isLowTime) MaterialTheme.colorScheme.errorContainer

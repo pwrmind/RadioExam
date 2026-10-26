@@ -6,14 +6,14 @@ import androidx.room.RoomDatabase
 
 object DatabaseProvider {
     @Volatile
-    private var INSTANCE: io.github.pwrmind.radioexam.AppDatabase? = null
+    private var INSTANCE: AppDatabase? = null
 
-    fun getDatabase(context: Context): io.github.pwrmind.radioexam.AppDatabase {
+    fun getDatabase(context: Context): AppDatabase {
         return INSTANCE ?: synchronized(this) {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
-                _root_ide_package_.io.github.pwrmind.radioexam.AppDatabase::class.java,
-                "radioexam_v10.db"
+                AppDatabase::class.java,
+                "radioexam_v12.db"
             )
                 .createFromAsset("database/app.db")
                 .fallbackToDestructiveMigration()

@@ -21,8 +21,9 @@ data class SectionEntity(
 @Entity(tableName = "questions")
 data class QuestionEntity(
     @PrimaryKey val id: Int,
-    val topicId: String,   // "4-1", "3-2", ... — тема, к которой относится вопрос
+    val topicId: String,
     val text: String,
+    val imageName: String?, // <--- НОВОЕ ПОЛЕ
     val hint: String?
 )
 
@@ -38,9 +39,9 @@ data class AnswerEntity(
 @Entity(tableName = "exam_rules")
 data class ExamRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val sectionId: String,   // "1", "2", "3", "4"
-    val topicId: String,     // "4-1", "2-5", ...
-    val pickCount: Int       // сколько вопросов взять из этой темы
+    val sectionId: String,
+    val topicId: String,
+    val pickCount: Int
 )
 
 // --- ТАБЛИЦЫ ПРОГРЕССА ---
@@ -86,34 +87,31 @@ data class SectionWithProgress(
 @Dao
 interface TestDao {
     @Query("SELECT * FROM sections")
-    suspend fun getAllSections(): List<io.github.pwrmind.radioexam.SectionEntity>
+    suspend fun getAllSections(): List<SectionEntity>
 
     @Query("SELECT * FROM sections WHERE id = :sectionId")
-    suspend fun getSectionById(sectionId: String): io.github.pwrmind.radioexam.SectionEntity?
+    suspend fun getSectionById(sectionId: String): SectionEntity?
 
-    // --- Правила и выборка ---
     @Query("SELECT * FROM exam_rules WHERE sectionId = :sectionId")
-    suspend fun getExamRules(sectionId: String): List<io.github.pwrmind.radioexam.ExamRuleEntity>
+    suspend fun getExamRules(sectionId: String): List<ExamRuleEntity>
 
     @Query("SELECT * FROM questions WHERE topicId = :topicId ORDER BY RANDOM() LIMIT :count")
-    suspend fun getRandomQuestionsByTopic(topicId: String, count: Int): List<io.github.pwrmind.radioexam.QuestionEntity>
+    suspend fun getRandomQuestionsByTopic(topicId: String, count: Int): List<QuestionEntity>
 
-    // --- Для экрана "Теория" ---
     @Query("SELECT * FROM questions WHERE topicId = :topicId ORDER BY id")
-    suspend fun getAllQuestionsByTopic(topicId: String): List<io.github.pwrmind.radioexam.QuestionEntity>
+    suspend fun getAllQuestionsByTopic(topicId: String): List<QuestionEntity>
 
     @Query("SELECT * FROM answers WHERE questionId = :questionId")
-    suspend fun getAnswers(questionId: Int): List<io.github.pwrmind.radioexam.AnswerEntity>
+    suspend fun getAnswers(questionId: Int): List<AnswerEntity>
 
-    // --- Попытки ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAttempt(attempt: io.github.pwrmind.radioexam.AttemptEntity): Long
+    suspend fun insertAttempt(attempt: AttemptEntity): Long
 
     @Query("SELECT * FROM attempts WHERE sectionId = :sectionId AND isCompleted = 0 ORDER BY lastUpdated DESC LIMIT 1")
-    suspend fun getActiveAttempt(sectionId: String): io.github.pwrmind.radioexam.AttemptEntity?
+    suspend fun getActiveAttempt(sectionId: String): AttemptEntity?
 
     @Update
-    suspend fun updateAttempt(attempt: io.github.pwrmind.radioexam.AttemptEntity)
+    suspend fun updateAttempt(attempt: AttemptEntity)
 
     @Query(
         "UPDATE attempts SET secondsLeft = :secondsLeft, lastUpdated = :lastUpdated " +
@@ -128,15 +126,14 @@ interface TestDao {
     suspend fun finishAttempt(attemptId: Long, lastUpdated: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertUserAnswer(answer: io.github.pwrmind.radioexam.UserAnswerEntity)
+    suspend fun insertUserAnswer(answer: UserAnswerEntity)
 
     @Query("SELECT * FROM user_answers WHERE attemptId = :attemptId")
-    suspend fun getUserAnswersForAttempt(attemptId: Long): List<io.github.pwrmind.radioexam.UserAnswerEntity>
+    suspend fun getUserAnswersForAttempt(attemptId: Long): List<UserAnswerEntity>
 
     @Query("SELECT * FROM questions WHERE id IN (SELECT questionId FROM user_answers WHERE attemptId = :attemptId)")
-    suspend fun getQuestionsForAttempt(attemptId: Long): List<io.github.pwrmind.radioexam.QuestionEntity>
+    suspend fun getQuestionsForAttempt(attemptId: Long): List<QuestionEntity>
 
-    // --- Сводки ---
     @Query(
         """
         SELECT
@@ -155,7 +152,7 @@ interface TestDao {
         ORDER BY a.lastUpdated DESC
         """
     )
-    suspend fun getInProgressSummaries(): List<io.github.pwrmind.radioexam.AttemptSummary>
+    suspend fun getInProgressSummaries(): List<AttemptSummary>
 
     @Query(
         """
@@ -175,7 +172,7 @@ interface TestDao {
         ORDER BY a.lastUpdated DESC
         """
     )
-    suspend fun getCompletedSummaries(): List<io.github.pwrmind.radioexam.AttemptSummary>
+    suspend fun getCompletedSummaries(): List<AttemptSummary>
 
     @Query(
         """
@@ -194,21 +191,21 @@ interface TestDao {
         ORDER BY s.id
         """
     )
-    suspend fun getSectionsWithProgress(): List<io.github.pwrmind.radioexam.SectionWithProgress>
+    suspend fun getSectionsWithProgress(): List<SectionWithProgress>
 }
 
 @Database(
     entities = [
-        _root_ide_package_.io.github.pwrmind.radioexam.SectionEntity::class,
-        _root_ide_package_.io.github.pwrmind.radioexam.QuestionEntity::class,
-        _root_ide_package_.io.github.pwrmind.radioexam.AnswerEntity::class,
-        _root_ide_package_.io.github.pwrmind.radioexam.ExamRuleEntity::class,
-        _root_ide_package_.io.github.pwrmind.radioexam.AttemptEntity::class,
-        _root_ide_package_.io.github.pwrmind.radioexam.UserAnswerEntity::class
+        SectionEntity::class,
+        QuestionEntity::class,
+        AnswerEntity::class,
+        ExamRuleEntity::class,
+        AttemptEntity::class,
+        UserAnswerEntity::class
     ],
-    version = 10,
+    version = 7, // <--- ПОДНЯЛИ ВЕРСИЮ
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun testDao(): io.github.pwrmind.radioexam.TestDao
+    abstract fun testDao(): TestDao
 }

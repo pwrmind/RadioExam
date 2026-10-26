@@ -1,4 +1,4 @@
-package io.example.radioexam
+package io.github.pwrmind.radioexam
 
 import android.app.Application
 import android.util.Log
@@ -11,11 +11,11 @@ import kotlinx.coroutines.launch
 
 class CatalogViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val database = _root_ide_package_.io.example.radioexam.DatabaseProvider.getDatabase(application)
+    private val database = _root_ide_package_.io.github.pwrmind.radioexam.DatabaseProvider.getDatabase(application)
     private val testDao = database.testDao()
 
-    private val _sections = MutableStateFlow<List<io.example.radioexam.SectionWithProgress>>(emptyList())
-    val sections: StateFlow<List<io.example.radioexam.SectionWithProgress>> = _sections.asStateFlow()
+    private val _sections = MutableStateFlow<List<io.github.pwrmind.radioexam.SectionWithProgress>>(emptyList())
+    val sections: StateFlow<List<io.github.pwrmind.radioexam.SectionWithProgress>> = _sections.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()

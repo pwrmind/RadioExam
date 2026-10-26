@@ -1,4 +1,4 @@
-package io.example.radioexam.ui.theme
+package io.github.pwrmind.radioexam.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

@@ -1,4 +1,4 @@
-package io.example.radioexam
+package io.github.pwrmind.radioexam
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState

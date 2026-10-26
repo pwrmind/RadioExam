@@ -1,4 +1,4 @@
-package io.example.radioexam
+package io.github.pwrmind.radioexam
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -29,15 +29,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import io.example.radioexam.ui.theme.RadioExamTheme
+import io.github.pwrmind.radioexam.ui.theme.RadioExamTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            _root_ide_package_.io.example.radioexam.ui.theme.RadioExamTheme {
-                _root_ide_package_.io.example.radioexam.RadioExamApp()
+            _root_ide_package_.io.github.pwrmind.radioexam.ui.theme.RadioExamTheme {
+                _root_ide_package_.io.github.pwrmind.radioexam.RadioExamApp()
             }
         }
     }
@@ -51,8 +51,8 @@ fun RadioExamApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showTopLevelChrome = currentRoute == _root_ide_package_.io.example.radioexam.Screen.Catalog.route ||
-            currentRoute == _root_ide_package_.io.example.radioexam.Screen.MyTests.route
+    val showTopLevelChrome = currentRoute == _root_ide_package_.io.github.pwrmind.radioexam.Screen.Catalog.route ||
+            currentRoute == _root_ide_package_.io.github.pwrmind.radioexam.Screen.MyTests.route
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 

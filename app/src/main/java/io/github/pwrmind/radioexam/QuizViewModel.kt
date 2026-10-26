@@ -1,4 +1,4 @@
-package io.example.radioexam
+package io.github.pwrmind.radioexam
 
 import android.app.Application
 import android.media.AudioManager

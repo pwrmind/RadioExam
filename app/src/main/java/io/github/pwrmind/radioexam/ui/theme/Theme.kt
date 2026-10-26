@@ -1,4 +1,4 @@
-package io.example.radioexam.ui.theme
+package io.github.pwrmind.radioexam.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -466,7 +468,7 @@ fun QuizScreen(
 
     val haptic = LocalHapticFeedback.current
     var showHintSheet by remember { mutableStateOf(false) }
-    var showGridSheet by remember { mutableStateOf(false) } // Состояние для сетки
+    var showGridSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(sectionId) {
         viewModel.loadTest(sectionId)
@@ -474,7 +476,7 @@ fun QuizScreen(
 
     LaunchedEffect(timeExpired) {
         if (timeExpired && questions.isNotEmpty()) {
-            onFinishQuiz(score, questions.size)
+            onFinishQuiz(viewModel.score.value, questions.size)
         }
     }
 
@@ -566,7 +568,7 @@ fun QuizScreen(
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     viewModel.jumpToQuestion(index)
-                                    showGridSheet = false // Закрываем сетку после выбора
+                                    showGridSheet = false
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -586,7 +588,7 @@ fun QuizScreen(
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        // Верхняя лента быстрого доступа
+        // --- 1. Верхняя фиксированная панель ---
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -630,7 +632,6 @@ fun QuizScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Кнопка открытия сетки вопросов
             IconButton(onClick = { showGridSheet = true }) {
                 Icon(
                     imageVector = Icons.Default.GridView,
@@ -670,102 +671,110 @@ fun QuizScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = currentQuestion.text,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextButton(
-            onClick = { showHintSheet = true },
-            contentPadding = PaddingValues(horizontal = 0.dp)
+        // --- 2. Центральная скроллируемая панель ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            Icon(
-                imageVector = Icons.Default.Lightbulb,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = currentQuestion.text,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Показать подсказку", style = MaterialTheme.typography.labelLarge)
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            answers.forEach { answer ->
-                val isSelected = selectedAnswerId == answer.id
+            TextButton(
+                onClick = { showHintSheet = true },
+                contentPadding = PaddingValues(horizontal = 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lightbulb,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Показать подсказку", style = MaterialTheme.typography.labelLarge)
+            }
 
-                val containerColor = when {
-                    isAnswered && answer.isCorrect -> MaterialTheme.colorScheme.tertiaryContainer
-                    isAnswered && isSelected && !answer.isCorrect -> MaterialTheme.colorScheme.errorContainer
-                    isSelected -> MaterialTheme.colorScheme.primaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceContainerLow
-                }
-                val contentColor = when {
-                    isAnswered && answer.isCorrect -> MaterialTheme.colorScheme.onTertiaryContainer
-                    isAnswered && isSelected && !answer.isCorrect -> MaterialTheme.colorScheme.onErrorContainer
-                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
-                val border = when {
-                    isAnswered && answer.isCorrect -> BorderStroke(
-                        2.dp, MaterialTheme.colorScheme.tertiary
-                    )
-                    isAnswered && isSelected && !answer.isCorrect -> BorderStroke(
-                        2.dp, MaterialTheme.colorScheme.error
-                    )
-                    isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                    else -> null
-                }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = containerColor,
-                    border = border,
-                    onClick = {
-                        if (!isAnswered) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.selectAnswer(answer.id)
-                        }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                answers.forEach { answer ->
+                    val isSelected = selectedAnswerId == answer.id
+
+                    val containerColor = when {
+                        isAnswered && answer.isCorrect -> MaterialTheme.colorScheme.tertiaryContainer
+                        isAnswered && isSelected && !answer.isCorrect -> MaterialTheme.colorScheme.errorContainer
+                        isSelected -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceContainerLow
                     }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = answer.text,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = contentColor,
-                            modifier = Modifier.weight(1f)
+                    val contentColor = when {
+                        isAnswered && answer.isCorrect -> MaterialTheme.colorScheme.onTertiaryContainer
+                        isAnswered && isSelected && !answer.isCorrect -> MaterialTheme.colorScheme.onErrorContainer
+                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                    val border = when {
+                        isAnswered && answer.isCorrect -> BorderStroke(
+                            2.dp, MaterialTheme.colorScheme.tertiary
                         )
-                        if (isAnswered) {
-                            Spacer(modifier = Modifier.width(12.dp))
-                            when {
-                                answer.isCorrect -> Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Правильно",
-                                    tint = MaterialTheme.colorScheme.tertiary
-                                )
-                                isSelected -> Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Неправильно",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                        isAnswered && isSelected && !answer.isCorrect -> BorderStroke(
+                            2.dp, MaterialTheme.colorScheme.error
+                        )
+                        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                        else -> null
+                    }
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        color = containerColor,
+                        border = border,
+                        onClick = {
+                            if (!isAnswered) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                viewModel.selectAnswer(answer.id)
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = answer.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = contentColor,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isAnswered) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                when {
+                                    answer.isCorrect -> Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Правильно",
+                                        tint = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    isSelected -> Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Неправильно",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp)) // Отступ снизу для красоты скролла
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
+        // --- 3. Нижняя фиксированная панель ---
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)

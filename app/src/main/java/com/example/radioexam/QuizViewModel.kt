@@ -113,9 +113,15 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     startTimer(remainingNow)
                 }
             } else {
-                val section = testDao.getSectionById(sectionId)
-                val count = section?.pickCount ?: 5
-                val loadedQuestions = testDao.getRandomQuestions(sectionId, count)
+                // НОВАЯ ЛОГИКА: собираем экзамен по правилам из полного пула вопросов
+                val rules = testDao.getExamRules(sectionId)
+                val collected = mutableListOf<QuestionEntity>()
+                for (rule in rules) {
+                    if (rule.pickCount > 0) {
+                        collected += testDao.getRandomQuestionsByTopic(rule.topicId, rule.pickCount)
+                    }
+                }
+                val loadedQuestions = collected.shuffled()
                 val maxSeconds = loadedQuestions.size * 60
 
                 val newAttempt = AttemptEntity(
@@ -126,7 +132,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 currentAttemptId = testDao.insertAttempt(newAttempt)
 
-                // ВАЖНО: Предзаполняем user_answers, чтобы вопросы не потерялись
                 loadedQuestions.forEach { q ->
                     testDao.insertUserAnswer(
                         UserAnswerEntity(
@@ -232,7 +237,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         saveTimerProgress()
-
         goToNextQuestion()
     }
 

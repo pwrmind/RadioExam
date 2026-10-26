@@ -2,15 +2,12 @@ package com.example.radioexam
 
 import androidx.room.Dao
 import androidx.room.Database
-import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
-import androidx.room.Relation
 import androidx.room.RoomDatabase
-import androidx.room.Transaction
 import androidx.room.Update
 
 // --- ТАБЛИЦЫ КОНТЕНТА ---
@@ -24,7 +21,7 @@ data class SectionEntity(
 @Entity(tableName = "questions")
 data class QuestionEntity(
     @PrimaryKey val id: Int,
-    val sectionId: String,
+    val topicId: String,   // "4-1", "3-2", ... — тема, к которой относится вопрос
     val text: String,
     val hint: String?
 )
@@ -35,6 +32,15 @@ data class AnswerEntity(
     val questionId: Int,
     val text: String,
     val isCorrect: Boolean
+)
+
+// --- ПРАВИЛА ЭКЗАМЕНОВ (КОНФИГУРАЦИЯ) ---
+@Entity(tableName = "exam_rules")
+data class ExamRuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val sectionId: String,   // "1", "2", "3", "4"
+    val topicId: String,     // "4-1", "2-5", ...
+    val pickCount: Int       // сколько вопросов взять из этой темы
 )
 
 // --- ТАБЛИЦЫ ПРОГРЕССА ---
@@ -53,18 +59,10 @@ data class UserAnswerEntity(
     val attemptId: Long,
     val questionId: Int,
     val selectedAnswerId: Long?,
-    val status: String // "UNTOUCHED", "SKIPPED", "CORRECT", "INCORRECT"
+    val status: String
 )
 
-data class AttemptWithSection(
-    @Embedded val attempt: AttemptEntity,
-    @Relation(
-        parentColumn = "sectionId",
-        entityColumn = "id"
-    )
-    val section: SectionEntity
-)
-
+// --- СВОДКИ ---
 data class AttemptSummary(
     val attemptId: Long,
     val sectionId: String,
@@ -84,7 +82,7 @@ data class SectionWithProgress(
     val answeredCount: Int
 )
 
-// --- ЗАПРОСЫ (DAO) ---
+// --- DAO ---
 @Dao
 interface TestDao {
     @Query("SELECT * FROM sections")
@@ -93,15 +91,21 @@ interface TestDao {
     @Query("SELECT * FROM sections WHERE id = :sectionId")
     suspend fun getSectionById(sectionId: String): SectionEntity?
 
-    @Query("SELECT * FROM questions WHERE sectionId = :sectionId ORDER BY RANDOM() LIMIT :count")
-    suspend fun getRandomQuestions(sectionId: String, count: Int): List<QuestionEntity>
+    // --- Правила и выборка ---
+    @Query("SELECT * FROM exam_rules WHERE sectionId = :sectionId")
+    suspend fun getExamRules(sectionId: String): List<ExamRuleEntity>
 
-    @Query("SELECT * FROM questions WHERE sectionId = :sectionId ORDER BY id")
-    suspend fun getQuestionsForSection(sectionId: String): List<QuestionEntity>
+    @Query("SELECT * FROM questions WHERE topicId = :topicId ORDER BY RANDOM() LIMIT :count")
+    suspend fun getRandomQuestionsByTopic(topicId: String, count: Int): List<QuestionEntity>
+
+    // --- Для экрана "Теория" ---
+    @Query("SELECT * FROM questions WHERE topicId = :topicId ORDER BY id")
+    suspend fun getAllQuestionsByTopic(topicId: String): List<QuestionEntity>
 
     @Query("SELECT * FROM answers WHERE questionId = :questionId")
     suspend fun getAnswers(questionId: Int): List<AnswerEntity>
 
+    // --- Попытки ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttempt(attempt: AttemptEntity): Long
 
@@ -115,20 +119,13 @@ interface TestDao {
         "UPDATE attempts SET secondsLeft = :secondsLeft, lastUpdated = :lastUpdated " +
                 "WHERE attemptId = :attemptId AND isCompleted = 0"
     )
-    suspend fun updateTimer(
-        attemptId: Long,
-        secondsLeft: Int,
-        lastUpdated: Long
-    )
+    suspend fun updateTimer(attemptId: Long, secondsLeft: Int, lastUpdated: Long)
 
     @Query(
         "UPDATE attempts SET isCompleted = 1, lastUpdated = :lastUpdated " +
                 "WHERE attemptId = :attemptId"
     )
-    suspend fun finishAttempt(
-        attemptId: Long,
-        lastUpdated: Long
-    )
+    suspend fun finishAttempt(attemptId: Long, lastUpdated: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUserAnswer(answer: UserAnswerEntity)
@@ -139,14 +136,7 @@ interface TestDao {
     @Query("SELECT * FROM questions WHERE id IN (SELECT questionId FROM user_answers WHERE attemptId = :attemptId)")
     suspend fun getQuestionsForAttempt(attemptId: Long): List<QuestionEntity>
 
-    @Transaction
-    @Query("SELECT * FROM attempts WHERE isCompleted = 0 ORDER BY lastUpdated DESC")
-    suspend fun getInProgressAttempts(): List<AttemptWithSection>
-
-    @Transaction
-    @Query("SELECT * FROM attempts WHERE isCompleted = 1 ORDER BY lastUpdated DESC")
-    suspend fun getCompletedAttempts(): List<AttemptWithSection>
-
+    // --- Сводки ---
     @Query(
         """
         SELECT
@@ -212,10 +202,11 @@ interface TestDao {
         SectionEntity::class,
         QuestionEntity::class,
         AnswerEntity::class,
+        ExamRuleEntity::class,
         AttemptEntity::class,
         UserAnswerEntity::class
     ],
-    version = 4,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

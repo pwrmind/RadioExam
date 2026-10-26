@@ -34,8 +34,15 @@ class TheoryViewModel(application: Application) : AndroidViewModel(application) 
                 val section = testDao.getSectionById(sectionId)
                 _sectionName.value = section?.name ?: sectionId
 
-                val questions = testDao.getQuestionsForSection(sectionId)
-                val result = questions.map { q ->
+                // Для экрана теории собираем все вопросы, которые могут
+                // встретиться в этом экзамене (по темам из правил).
+                val rules = testDao.getExamRules(sectionId)
+                val allQuestions = mutableListOf<QuestionEntity>()
+                for (rule in rules) {
+                    allQuestions += testDao.getAllQuestionsByTopic(rule.topicId)
+                }
+
+                val result = allQuestions.map { q ->
                     val answers = testDao.getAnswers(q.id)
                     TheoryItem(
                         question = q,
@@ -44,7 +51,6 @@ class TheoryViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 _items.value = result
             } catch (e: Exception) {
-                // В реальном проекте тут можно обработать ошибку
                 _items.value = emptyList()
             } finally {
                 _isLoading.value = false

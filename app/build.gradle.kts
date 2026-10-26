@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.radioexam"
+    namespace = "io.github.pwrmind.radioexam"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.radioexam"
+        applicationId = "io.github.pwrmind.radioexam"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
